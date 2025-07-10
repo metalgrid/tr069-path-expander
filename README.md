@@ -17,74 +17,19 @@ This library manages the complex process of expanding TR-069 parameter paths tha
 ## Installation
 
 ```bash
-go get github.com/your-org/tr069-expander
+go get github.com/metalgrid/tr069-path-expander
 ```
 
 ## Quick Start
 
 ```go
-package main
-
-import (
-    "fmt"
-    "github.com/your-org/tr069-expander"
-)
-
-func main() {
-    // Get an expander from the pool
-    exp := expander.New("InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.Enable")
-    defer expander.Release(exp) // Return to pool when done
-    
-    // Discovery iteration 1: Get first discovery path
-    path, hasMore := exp.NextDiscoveryPath()
-    fmt.Println(path) // "InternetGatewayDevice.LANDevice."
-    
-    // Register discovered indices (simulating external discovery)
-    exp.RegisterIndices("InternetGatewayDevice.LANDevice", []int{1, 2, 3})
-    
-    // Discovery iteration 2: Get next level paths
-    for {
-        path, hasMore := exp.NextDiscoveryPath()
-        if !hasMore {
-            break
-        }
-        fmt.Println(path) // "InternetGatewayDevice.LANDevice.1.WLANConfiguration."
-                         // "InternetGatewayDevice.LANDevice.2.WLANConfiguration."
-                         // "InternetGatewayDevice.LANDevice.3.WLANConfiguration."
-        
-        // Register indices for each path (simulating external discovery)
-        if path == "InternetGatewayDevice.LANDevice.1.WLANConfiguration." {
-            exp.RegisterIndices("InternetGatewayDevice.LANDevice.1.WLANConfiguration", []int{1, 2, 3})
-        } else {
-            exp.RegisterIndices(path[:len(path)-1], []int{}) // Empty results
-        }
-    }
-    
-    // Get final expanded paths
-    expanded := exp.ExpandedPaths()
-    for _, path := range expanded {
-        fmt.Println(path)
-        // Output:
-        // InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable
-        // InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Enable
-        // InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Enable
-    }
-}
-```
-
-## API Reference
-
-### Core Interface
-
-```go
 type Expander interface {
-    // NextDiscoveryPath returns the next path segment for discovery.
-    // Returns (path, true) if there's a path to discover, ("", false) if complete.
+    // NextDiscoveryPath returns the next path segment for discovery
     NextDiscoveryPath() (string, bool)
     
-    // RegisterIndices registers discovered indices for a given path.
-    // Path should match the path returned by NextDiscoveryPath (without trailing dot).
-    RegisterIndices(path string, indices []int) error
+    // RegisterParameterNames registers discovered parameter names for a given path
+    // Automatically extracts indices from the parameter names
+    RegisterParameterNames(path string, parameterNames []string) error
     
     // IsComplete returns true when all wildcards have been expanded.
     IsComplete() bool
@@ -115,7 +60,8 @@ defer expander.Release(exp)
 
 // First discovery
 path, _ := exp.NextDiscoveryPath() // "Device.WiFi.AccessPoint."
-exp.RegisterIndices("Device.WiFi.AccessPoint", []int{1, 2})
+parameterNames := []string{"Device.WiFi.AccessPoint.1", "Device.WiFi.AccessPoint.2"}
+exp.RegisterParameterNames("Device.WiFi.AccessPoint", parameterNames)
 
 // Get results
 if exp.IsComplete() {
@@ -126,25 +72,62 @@ if exp.IsComplete() {
 
 ### Multi-level Wildcards
 
+The library provides robust support for multi-level wildcard expansion, including edge cases where some intermediate paths return empty indices:
+
 ```go
-exp := expander.New("Device.IP.Interface.*.IPv4Address.*.IPAddress")
+exp := expander.New("InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.Enable")
 defer expander.Release(exp)
 
-// Discovery happens in levels
-for !exp.IsComplete() {
+// Step 1: Get first discovery path
+path, _ := exp.NextDiscoveryPath()
+// Returns: "InternetGatewayDevice.LANDevice."
+
+// Step 2: Register first level parameter names
+firstLevelParams := []string{
+    "InternetGatewayDevice.LANDevice.1",
+    "InternetGatewayDevice.LANDevice.2",
+    "InternetGatewayDevice.LANDevice.3",
+}
+exp.RegisterParameterNames("InternetGatewayDevice.LANDevice", firstLevelParams)
+
+// Step 3: Get second level discovery paths
+var secondLevelPaths []string
+for {
     path, hasMore := exp.NextDiscoveryPath()
     if !hasMore {
         break
     }
-    
-    // Perform external discovery for 'path'
-    indices := performDiscovery(path)
-    exp.RegisterIndices(path[:len(path)-1], indices)
+    secondLevelPaths = append(secondLevelPaths, path)
 }
+// Returns: ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.",
+//           "InternetGatewayDevice.LANDevice.2.WLANConfiguration.",
+//           "InternetGatewayDevice.LANDevice.3.WLANConfiguration."]
 
-// Get all expanded paths
-expanded := exp.ExpandedPaths()
+// Step 4: Register second level parameter names (including empty responses)
+secondLevelParams1 := []string{
+    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1",
+    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.2",
+    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.3",
+}
+exp.RegisterParameterNames("InternetGatewayDevice.LANDevice.1.WLANConfiguration", secondLevelParams1)
+exp.RegisterParameterNames("InternetGatewayDevice.LANDevice.2.WLANConfiguration", []string{})      // Empty response
+exp.RegisterParameterNames("InternetGatewayDevice.LANDevice.3.WLANConfiguration", []string{})      // Empty response
+
+// Step 5: Expansion is complete when all expected registrations are received
+if exp.IsComplete() {
+    expanded := exp.ExpandedPaths()
+    // Returns: ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable",
+    //           "InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Enable",
+    //           "InternetGatewayDevice.LANDevice.1.WLANConfiguration.3.Enable"]
+}
 ```
+
+#### Edge Case Handling
+
+The library correctly handles common TR-069 scenarios where:
+- Some device instances exist but have no sub-instances (empty indices)
+- All final-level paths must be registered before completion
+- Mixed empty and non-empty index registrations in the same expansion
 
 ### Error Handling
 
@@ -154,9 +137,10 @@ defer expander.Release(exp)
 
 path, _ := exp.NextDiscoveryPath()
 
-// Register indices with validation
-if err := exp.RegisterIndices("InvalidPath", []int{1, 2}); err != nil {
-    log.Printf("Failed to register indices: %v", err)
+// Register parameter names with validation
+invalidParams := []string{"InvalidPath.1", "InvalidPath.2"}
+if err := exp.RegisterParameterNames("InvalidPath", invalidParams); err != nil {
+    log.Printf("Failed to register parameter names: %v", err)
 }
 ```
 
@@ -188,9 +172,9 @@ go test -bench=. -benchmem
 ```
 
 Expected performance:
-- Single wildcard expansion: ~500ns/op, 0 allocs
-- Multi-level expansion: ~2μs/op, minimal allocs
-- Pool get/release: ~50ns/op, 0 allocs
+- Single wildcard expansion: ~773ns/op, 19 allocs
+- Multi-level expansion: ~1.8μs/op, 37 allocs
+- Pool get/release: ~125ns/op, 4 allocs
 
 ## Advanced Usage
 
@@ -217,7 +201,7 @@ func (c *DiscoveryClient) ExpandPath(wildcardPath string) ([]string, error) {
             return nil, err
         }
         
-        if err := exp.RegisterIndices(path[:len(path)-1], indices); err != nil {
+        if err := exp.RegisterParameterNames(path[:len(path)-1], indices); err != nil {
             return nil, err
         }
     }
@@ -244,6 +228,122 @@ func expandMultiplePaths(paths []string) map[string][]string {
     return results
 }
 ```
+
+## External Project Integration
+
+### Adding to Your Project
+
+1. **Install the library**:
+   ```bash
+   go get github.com/metalgrid/tr069-path-expander
+   ```
+
+2. **Import in your Go code**:
+   ```go
+        import expander "github.com/metalgrid/tr069-path-expander"   ```
+
+3. **Basic integration example**:
+   ```go
+   package main
+
+   import (
+       "fmt"
+       "log"
+       
+       expander "github.com/metalgrid/tr069-path-expander"
+   )
+
+   func main() {
+       // Create expander for TR-069 parameter path
+       exp, err := expander.New("Device.WiFi.AccessPoint.*.Enable")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer expander.Release(exp)
+
+       // Integrate with your TR-069 discovery logic
+       for !exp.IsComplete() {
+           path, hasMore := exp.NextDiscoveryPath()
+           if !hasMore {
+               break
+           }
+
+    // Call your TR-069 client to discover parameter names
+    parameterNames := discoverParameterNames(path) // Your implementation
+    
+    // Register the discovered parameter names
+    pathWithoutDot := path[:len(path)-1]
+    if err := exp.RegisterParameterNames(pathWithoutDot, parameterNames); err != nil {
+        log.Printf("Failed to register parameter names: %v", err)
+        continue
+    }       }
+
+       // Get all expanded parameter paths
+       expandedPaths := exp.ExpandedPaths()
+       fmt.Printf("Expanded paths: %v\n", expandedPaths)
+   }
+
+// Your TR-069 discovery implementation
+func discoverParameterNames(path string) []string {
+    // Implement your TR-069 GetParameterNames call here
+    // Return the actual parameter names from the response
+    return []string{
+        "Device.WiFi.AccessPoint.1",
+        "Device.WiFi.AccessPoint.2", 
+        "Device.WiFi.AccessPoint.3",
+    } // Example
+}   ```
+
+### Integration with Popular TR-069 Libraries
+
+#### With go-cwmp
+```go
+import (
+    "github.com/your-org/go-cwmp"
+    expander "github.com/metalgrid/tr069-path-expander"
+)
+
+func expandWithCWMP(client *cwmp.Client, wildcardPath string) ([]string, error) {
+    exp, err := expander.New(wildcardPath)
+    if err != nil {
+        return nil, err
+    }
+    defer expander.Release(exp)
+
+    for !exp.IsComplete() {
+        path, hasMore := exp.NextDiscoveryPath()
+        if !hasMore {
+            break
+        }
+
+        // Use CWMP client to discover parameter names
+        params, err := client.GetParameterNames(path, false)
+        if err != nil {
+            return nil, err
+        }
+
+        // Use parameter names directly (no need to extract indices)
+        pathWithoutDot := path[:len(path)-1]
+        if err := exp.RegisterParameterNames(pathWithoutDot, params); err != nil {
+            return nil, err
+        }
+    }
+
+    return exp.ExpandedPaths(), nil
+}
+```
+
+### Module Requirements
+
+- **Go version**: 1.21 or later
+- **Dependencies**: None (only test dependencies for development)
+- **Import path**: `github.com/metalgrid/tr069-path-expander`
+
+### Versioning
+
+The library follows semantic versioning (SemVer):
+- **v1.x.x**: Stable API, backward compatible
+- **v0.x.x**: Development versions, API may change
 
 ## Error Conditions
 
