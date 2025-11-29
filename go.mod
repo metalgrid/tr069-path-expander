@@ -1,4 +1,4 @@
-module github.com/metalgrid/tr069-path-expander
+module github.com/metalgrid/tr069-path-expander/v2
 
 go 1.24.5
 

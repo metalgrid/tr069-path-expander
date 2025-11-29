@@ -3,7 +3,7 @@ package expander_test
 import (
 	"testing"
 
-	expander "github.com/metalgrid/tr069-path-expander"
+	expander "github.com/metalgrid/tr069-path-expander/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
