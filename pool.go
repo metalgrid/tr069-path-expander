@@ -2,36 +2,40 @@ package expander
 
 import "sync"
 
-// expanderPool manages a pool of wildcard expanders for performance optimization.
+// expanderPool manages a pool of expanders for performance optimization.
+// When an expander is retrieved from the pool, it starts with a fresh state.
 var expanderPool = sync.Pool{
 	New: func() any {
-		return &wildcardExpander{
-			discoveredPaths:      make(map[string][]int),
-			pendingPaths:         make([]string, 0, 8),
-			completedPaths:       make([]string, 0, 16),
-			expectedFinalPaths:   make(map[string]bool),
-			registeredFinalPaths: make(map[string]bool),
+		return &Expander{
+			paths: pathTree{
+				root: &pathNode{
+					children: make(map[string]*pathNode),
+				},
+			},
+			cache:                make(map[string][]int),
+			processedDiscoveries: make(map[string]bool),
+			expandedSet:          make(map[string]bool),
+			pendingDiscoveries:   make([]string, 0, 8),
+			expandedPaths:        make([]string, 0, 16),
 		}
 	},
 }
 
-// New creates a new expander from the pool, initialized with the given wildcard path.
-// The returned expander should be released back to the pool using Release() when done.
-func New(wildcardPath string) (Expander, error) {
-	exp := expanderPool.Get().(*wildcardExpander)
-
-	if err := exp.reset(wildcardPath); err != nil {
-		expanderPool.Put(exp)
-		return nil, err
-	}
-
-	return exp, nil
+// Get retrieves an expander from the pool with a fresh state.
+// The expander should be returned to the pool using Release() when done.
+// If you want to reuse the cache, keep the expander instance and don't release it.
+func Get() *Expander {
+	exp := expanderPool.Get().(*Expander)
+	// Ensure clean state
+	exp.Reset()
+	return exp
 }
 
 // Release returns an expander to the pool for reuse.
-// The expander should not be used after calling Release().
-func Release(exp Expander) {
-	if wExp, ok := exp.(*wildcardExpander); ok {
-		expanderPool.Put(wExp)
+// The expander's state will be reset when it's retrieved again.
+// Do not use the expander after calling Release().
+func Release(exp *Expander) {
+	if exp != nil {
+		expanderPool.Put(exp)
 	}
 }
