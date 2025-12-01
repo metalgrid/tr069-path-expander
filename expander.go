@@ -45,7 +45,6 @@ type pathNode struct {
 	children   map[string]*pathNode
 	isWildcard bool
 	isLeaf     bool
-	leafNames  []string // Store original leaf names for final expansion
 }
 
 // pathTree represents the tree structure of all paths to be expanded
