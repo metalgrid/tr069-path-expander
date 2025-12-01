@@ -10,7 +10,7 @@ func BenchmarkSingleWildcard(b *testing.B) {
 	for range b.N {
 		exp := expander.Get()
 
-		err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+		err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -52,7 +52,7 @@ func BenchmarkMultiWildcard(b *testing.B) {
 	for range b.N {
 		exp := expander.Get()
 
-		err := exp.Add([]string{"Device.IP.Interface.*.IPv4Address.*.IPAddress"})
+		err := exp.Add("Device.IP.Interface.*.IPv4Address.*.IPAddress")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -109,12 +109,12 @@ func BenchmarkCommonAncestor(b *testing.B) {
 		exp := expander.Get()
 
 		// Add multiple paths with common ancestor
-		err := exp.Add([]string{
+		err := exp.Add(
 			"Device.WiFi.AccessPoint.*.Enable",
 			"Device.WiFi.AccessPoint.*.Status",
 			"Device.WiFi.AccessPoint.*.Name",
 			"Device.WiFi.AccessPoint.*.SSID",
-		})
+		)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -166,7 +166,7 @@ func BenchmarkDynamicAddition(b *testing.B) {
 		exp := expander.Get()
 
 		// Initial paths
-		err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+		err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -181,7 +181,7 @@ func BenchmarkDynamicAddition(b *testing.B) {
 		}
 
 		// Dynamic addition (should use cache)
-		err = exp.Add([]string{"Device.WiFi.AccessPoint.*.Status"})
+		err = exp.Add("Device.WiFi.AccessPoint.*.Status")
 		if err != nil {
 			b.Fatal(err)
 		}

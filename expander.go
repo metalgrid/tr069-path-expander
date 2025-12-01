@@ -55,6 +55,7 @@ type pathTree struct {
 
 // Common errors returned by the expander
 var (
+	ErrEmptyPath       = errors.New("empty path")
 	ErrInvalidPath     = errors.New("invalid path format")
 	ErrEmptyResults    = errors.New("results cannot be empty")
 	ErrNoDiscovery     = errors.New("no discovery path available")
@@ -64,9 +65,9 @@ var (
 // Add adds one or more paths for expansion. Paths can be added at any time,
 // and the expander will reuse its cache for common ancestors.
 // Duplicate paths are automatically handled and won't appear twice in the output.
-func (e *Expander) Add(paths []string) error {
+func (e *Expander) Add(paths ...string) error {
 	if len(paths) == 0 {
-		return nil
+		return ErrEmptyPath
 	}
 
 	// Mark as not complete since we're adding new paths

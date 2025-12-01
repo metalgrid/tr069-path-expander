@@ -42,10 +42,10 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should return the paths unchanged", func() {
-				err := exp.Add([]string{
+				err := exp.Add(
 					"InternetGatewayDevice.LANDevice.1.Enable",
 					"InternetGatewayDevice.LANDevice.2.Enable",
-				})
+				)
 				Expect(err).NotTo(HaveOccurred())
 
 				// No discovery needed
@@ -69,7 +69,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should return an error for empty path", func() {
-				err := exp.Add([]string{""})
+				err := exp.Add("")
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(expander.ErrInvalidPath))
 			})
@@ -83,7 +83,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should provide the correct discovery path", func() {
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				path, hasMore := exp.Next()
@@ -92,7 +92,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should expand paths after registration", func() {
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Get discovery path
@@ -122,7 +122,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should handle empty discovery results", func() {
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				_, _ = exp.Next()
@@ -149,9 +149,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should handle nested wildcard expansion", func() {
-				err := exp.Add([]string{
-					"InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.Enable",
-				})
+				err := exp.Add("InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				// First level discovery
@@ -214,11 +212,11 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should only request common ancestor once", func() {
-				err := exp.Add([]string{
+				err := exp.Add(
 					"Device.WiFi.AccessPoint.*.Enable",
 					"Device.WiFi.AccessPoint.*.Status",
 					"Device.WiFi.AccessPoint.*.Name",
-				})
+				)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Should only get one discovery path for the common wildcard
@@ -260,7 +258,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 
 			It("should reuse cache for common ancestors", func() {
 				// Initial expansion
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				_, hasMore := exp.Next()
@@ -280,7 +278,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 				Expect(initialPaths).To(HaveLen(2))
 
 				// Add another path with same ancestor
-				err = exp.Add([]string{"Device.WiFi.AccessPoint.*.Status"})
+				err = exp.Add("Device.WiFi.AccessPoint.*.Status")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Should not need discovery (uses cache)
@@ -300,7 +298,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 
 			It("should handle new ancestors that need discovery", func() {
 				// Initial expansion
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				path, _ := exp.Next()
@@ -313,7 +311,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 				Expect(hasMore).To(BeFalse())
 
 				// Add path with different ancestor
-				err = exp.Add([]string{"Device.Ethernet.Interface.*.Status"})
+				err = exp.Add("Device.Ethernet.Interface.*.Status")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Should need new discovery
@@ -348,10 +346,10 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should not produce duplicate expanded paths", func() {
-				err := exp.Add([]string{
+				err := exp.Add(
 					"Device.WiFi.AccessPoint.*.Enable",
 					"Device.WiFi.AccessPoint.*.Enable", // Duplicate
-				})
+				)
 				Expect(err).NotTo(HaveOccurred())
 
 				_, _ = exp.Next()
@@ -383,7 +381,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			})
 
 			It("should return error if expansion not complete", func() {
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				// Try to collect before completion
@@ -400,7 +398,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 
 			It("should return error", func() {
 				// Add path without wildcards (immediately complete)
-				err := exp.Add([]string{"Device.WiFi.AccessPoint.1.Enable"})
+				err := exp.Add("Device.WiFi.AccessPoint.1.Enable")
 				Expect(err).NotTo(HaveOccurred())
 
 				_, hasMore := exp.Next()
@@ -418,7 +416,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 		It("should provide fresh state after release and get", func() {
 			// First usage
 			exp = expander.Get()
-			err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+			err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 			Expect(err).NotTo(HaveOccurred())
 
 			_, _ = exp.Next()
@@ -438,7 +436,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			exp = expander.Get()
 
 			// First operation
-			err := exp.Add([]string{"Device.WiFi.AccessPoint.*.Enable"})
+			err := exp.Add("Device.WiFi.AccessPoint.*.Enable")
 			Expect(err).NotTo(HaveOccurred())
 
 			_, _ = exp.Next()
@@ -452,7 +450,7 @@ var _ = Describe("TR-069 Path Expander", func() {
 			Expect(hasMore).To(BeFalse())
 
 			// Reuse same instance without release
-			err = exp.Add([]string{"Device.WiFi.AccessPoint.*.Status"})
+			err = exp.Add("Device.WiFi.AccessPoint.*.Status")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should use cache - no discovery needed
@@ -471,13 +469,13 @@ var _ = Describe("TR-069 Path Expander", func() {
 		})
 
 		It("should handle TR-069 WAN connection parameters", func() {
-			err := exp.Add([]string{
+			err := exp.Add(
 				"InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.Enable",
 				"InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.ConnectionStatus",
 				"InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.ConnectionType",
 				"InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.Name",
 				"InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.Uptime",
-			})
+			)
 			Expect(err).NotTo(HaveOccurred())
 
 			// First level: WANDevice
